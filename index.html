@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>2026 NFL Mock Draft Simulator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Persistent stale-data banner -->
+<div id="stale-banner" class="stale-banner">
+  <span class="stale-icon" aria-hidden="true">&#9888;</span>
+  <span>
+    <b>Data as of Apr&nbsp;21,&nbsp;2026.</b> The real 2026 NFL Draft is live Apr&nbsp;23 — results may diverge from seed data.
+    <button type="button" class="link" id="about-btn">What does this mean?</button>
+  </span>
+  <button type="button" class="icon-btn" id="live-mode-btn" title="Mark prospects as already drafted IRL">Live Draft Mode</button>
+</div>
+
+<header class="topbar" id="topbar" hidden>
+  <div class="top-left">
+    <span class="pick-badge">
+      <span id="top-round">R1</span>
+      &middot;
+      <span id="top-overall">#1</span>
+    </span>
+    <span id="top-team-badge" class="team-badge">LV</span>
+    <span id="top-team-name" class="muted">Las Vegas Raiders</span>
+    <span id="top-onclock" class="muted">on the clock</span>
+  </div>
+  <div class="top-center">
+    <span id="timer-ring" class="timer-ring" hidden>
+      <svg viewBox="0 0 36 36" class="timer-svg">
+        <circle cx="18" cy="18" r="15.9" class="timer-track"/>
+        <circle cx="18" cy="18" r="15.9" class="timer-progress" id="timer-progress"/>
+      </svg>
+      <span class="timer-text" id="timer-text">--</span>
+    </span>
+  </div>
+  <div class="top-right">
+    <button type="button" class="icon-btn" id="btn-undo" title="Undo last pick (U)">Undo</button>
+    <button type="button" class="icon-btn" id="btn-next-user" title="Jump to next user pick (N)">Next&nbsp;me</button>
+    <button type="button" class="icon-btn" id="btn-skip-end" title="Skip to end of draft (S)">Skip</button>
+    <button type="button" class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts (?)">?</button>
+  </div>
+</header>
+
+<main>
+  <!-- ========== Setup screen ========== -->
+  <section id="screen-setup" class="screen" data-screen="setup">
+    <div class="hero">
+      <h1>2026 NFL Mock Draft Simulator</h1>
+      <p class="hero-sub">GM a team through all 7 rounds. Trade picks. Grade the class.</p>
+    </div>
+
+    <div class="setup-body">
+      <div class="setup-col">
+        <h2>Select teams to control</h2>
+        <p class="muted">Click one or more. Select all 32 for full manual control (AI disabled).</p>
+        <div id="team-grid" class="team-grid"></div>
+        <div class="row">
+          <button type="button" class="btn-ghost" id="btn-select-all">Select all 32</button>
+          <button type="button" class="btn-ghost" id="btn-select-none">Clear</button>
+        </div>
+      </div>
+
+      <div class="setup-col">
+        <h2>Options</h2>
+
+        <label class="option-row">
+          <span>Rounds to simulate</span>
+          <select id="opt-rounds">
+            <option value="1">1 (first round only)</option>
+            <option value="2">1&ndash;2</option>
+            <option value="3">1&ndash;3</option>
+            <option value="4">1&ndash;4</option>
+            <option value="5">1&ndash;5</option>
+            <option value="6">1&ndash;6</option>
+            <option value="7" selected>All 7 rounds</option>
+          </select>
+        </label>
+
+        <label class="option-row">
+          <span>Pick timer</span>
+          <input type="checkbox" id="opt-timer">
+        </label>
+        <label class="option-row option-sub" id="row-timer-seconds" hidden>
+          <span>Seconds per pick (R1 / R2&ndash;3 / R4&ndash;7)</span>
+          <span class="timer-seconds">
+            <input type="number" id="opt-timer-r1" value="300" min="15" max="600" step="15">
+            <input type="number" id="opt-timer-r2" value="180" min="15" max="600" step="15">
+            <input type="number" id="opt-timer-r4" value="120" min="15" max="600" step="15">
+          </span>
+        </label>
+
+        <label class="option-row">
+          <span>AI randomness <span class="muted" id="opt-rand-val">0.10</span></span>
+          <input type="range" id="opt-randomness" min="0" max="0.3" step="0.01" value="0.10">
+        </label>
+
+        <label class="option-row">
+          <span>Enable AI-to-AI trades</span>
+          <input type="checkbox" id="opt-ai-trades">
+        </label>
+
+        <div class="setup-footer">
+          <button type="button" class="btn-primary" id="btn-start">Start Draft</button>
+          <button type="button" class="btn-ghost" id="btn-about">About / Data sources</button>
+        </div>
+        <div id="resume-banner" class="resume-banner" hidden>
+          <span>Resume draft in progress? Last saved <span id="resume-time">&mdash;</span></span>
+          <button type="button" class="btn-primary" id="btn-resume">Resume</button>
+          <button type="button" class="btn-ghost" id="btn-discard">Start new</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== Draft screen ========== -->
+  <section id="screen-draft" class="screen" data-screen="draft" hidden>
+    <div class="draft-layout">
+      <aside class="panel-order" aria-label="Draft order">
+        <div class="panel-header">
+          <span>Draft Order</span>
+          <span class="muted"><span id="order-done">0</span>/<span id="order-total">257</span></span>
+        </div>
+        <div id="order-list" class="order-list" role="list"></div>
+      </aside>
+
+      <section class="panel-center">
+        <div id="board-header" class="board-header">
+          <div class="board-title">
+            <h2 id="board-heading">Prospect Board</h2>
+            <span class="muted" id="board-sub">Best available &middot; 0 remaining</span>
+          </div>
+          <div class="board-controls">
+            <input type="search" id="board-search" placeholder="Search name or school…" aria-label="Search prospects">
+            <div class="pos-tabs" id="pos-tabs"></div>
+          </div>
+        </div>
+        <div id="board-list" class="board-list"></div>
+        <div id="ai-thinking" class="ai-thinking" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="ai-thinking-text">On the clock...</span>
+        </div>
+      </section>
+
+      <aside class="panel-team" aria-label="My team">
+        <div class="panel-header">
+          <span id="my-team-name">My team</span>
+          <select id="my-team-switch"></select>
+        </div>
+        <div class="my-needs">
+          <h3>Needs</h3>
+          <ol id="my-needs-list"></ol>
+        </div>
+        <div class="my-picks">
+          <h3>Picks owned</h3>
+          <ul id="my-picks-list"></ul>
+        </div>
+        <div class="my-roster">
+          <h3>Roster drafted</h3>
+          <div id="my-roster-list"></div>
+        </div>
+        <button type="button" class="btn-ghost full" id="btn-propose-trade">Propose Trade</button>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ========== Results screen ========== -->
+  <section id="screen-results" class="screen" data-screen="results" hidden>
+    <div class="results-head">
+      <h1>Draft Results</h1>
+      <div class="results-actions">
+        <button type="button" class="btn-ghost" id="btn-export-text">Export text</button>
+        <button type="button" class="btn-ghost" id="btn-export-image">Export image</button>
+        <button type="button" class="btn-ghost" id="btn-new-draft">New draft</button>
+      </div>
+    </div>
+    <div class="results-body">
+      <div id="grades-grid" class="grades-grid"></div>
+      <aside class="grades-side">
+        <section>
+          <h3>Steals</h3>
+          <ol id="league-steals"></ol>
+        </section>
+        <section>
+          <h3>Reaches</h3>
+          <ol id="league-reaches"></ol>
+        </section>
+        <section>
+          <h3>Surprises</h3>
+          <ul id="league-surprises"></ul>
+        </section>
+        <section>
+          <h3>Recap</h3>
+          <p id="league-recap" class="recap"></p>
+        </section>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<!-- ========== Modals ========== -->
+<div id="modal-root" class="modal-root" hidden>
+  <div class="modal-backdrop" data-dismiss="true"></div>
+
+  <!-- Trade modal -->
+  <div id="modal-trade" class="modal" hidden role="dialog" aria-labelledby="trade-title">
+    <header class="modal-header">
+      <h2 id="trade-title">Propose Trade</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <div class="trade-body">
+      <div class="trade-col">
+        <h3>You give</h3>
+        <select id="trade-from-team"></select>
+        <div id="trade-give-picks" class="pick-picker"></div>
+        <div class="trade-total">Total <span id="trade-give-total">0</span></div>
+      </div>
+      <div class="trade-col">
+        <h3>You get</h3>
+        <select id="trade-to-team"></select>
+        <div id="trade-get-picks" class="pick-picker"></div>
+        <div class="trade-total">Total <span id="trade-get-total">0</span></div>
+      </div>
+    </div>
+    <div class="trade-summary">
+      <span id="trade-delta">&mdash;</span>
+      <span id="trade-verdict" class="verdict">&mdash;</span>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" class="btn-primary" id="btn-send-trade">Send offer</button>
+      <button type="button" class="btn-ghost" data-close>Cancel</button>
+    </footer>
+  </div>
+
+  <!-- Live mode modal -->
+  <div id="modal-live" class="modal" hidden role="dialog" aria-labelledby="live-title">
+    <header class="modal-header">
+      <h2 id="live-title">Live Draft Mode</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <p class="muted">
+      The real 2026 NFL Draft is happening live right now. Mark prospects as already taken to remove them from the pool so the sim stays in sync with reality.
+    </p>
+    <div class="live-body">
+      <input type="search" id="live-search" placeholder="Search a prospect…">
+      <div id="live-list" class="live-list"></div>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" class="btn-ghost" data-close>Done</button>
+    </footer>
+  </div>
+
+  <!-- About modal -->
+  <div id="modal-about" class="modal" hidden role="dialog" aria-labelledby="about-title">
+    <header class="modal-header">
+      <h2 id="about-title">About this sim</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <div class="about-body">
+      <p>
+        A browser-only simulator for the 2026 NFL Draft. No server, no build step.
+        Your picks save automatically to <code>localStorage</code>.
+      </p>
+      <h3>Data cutoff</h3>
+      <p><b>April 21, 2026.</b> The real draft began April 23, 2026 in Pittsburgh. Live results may diverge from the seed data below — use <b>Live Draft Mode</b> to mark prospects as already taken.</p>
+      <h3>Sources used</h3>
+      <ul>
+        <li>Draft order (257 picks) — NBC Sports NY, Sharp Football Analysis (Apr 20-21, 2026).</li>
+        <li>Prospect rankings — Daniel Jeremiah Top 150 (NFL.com, Apr 20), consensus via NFL Mock Draft Database, Dane Brugler (The Athletic), PFF, Mel Kiper (ESPN), Bleacher Report.</li>
+        <li>Team needs — CBS Sports, Yahoo Sports team-needs trackers (Apr 18-20).</li>
+        <li>Trade chart — Jimmy Johnson (picks 1&ndash;224), extrapolated linearly to 0 for picks 225&ndash;257.</li>
+      </ul>
+      <h3>Known caveats</h3>
+      <ul>
+        <li>Heights/weights past the top 30 are position-typical estimates (marked <b>*</b> in the UI).</li>
+        <li>AI GMs are stingier on non-QB moves; they'll sometimes surprise you.</li>
+        <li>Prospect list is ~220 names. If the pool runs dry in R7, remaining picks auto-fill as "UDFA-grade."</li>
+      </ul>
+    </div>
+    <footer class="modal-footer">
+      <button type="button" class="btn-ghost" data-close>Close</button>
+    </footer>
+  </div>
+
+  <!-- Shortcuts modal -->
+  <div id="modal-shortcuts" class="modal" hidden role="dialog" aria-labelledby="sc-title">
+    <header class="modal-header">
+      <h2 id="sc-title">Keyboard shortcuts</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <dl class="shortcut-list">
+      <dt><kbd>Space</kbd></dt><dd>Auto-pick (BPA) for whoever is on the clock</dd>
+      <dt><kbd>N</kbd></dt><dd>Jump to your next pick — AI fast-picks intervening slots</dd>
+      <dt><kbd>S</kbd></dt><dd>Skip to end of draft — AI fast-picks everything remaining</dd>
+      <dt><kbd>U</kbd></dt><dd>Undo most recent pick</dd>
+      <dt><kbd>T</kbd></dt><dd>Open trade modal</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close any open modal</dd>
+      <dt><kbd>?</kbd></dt><dd>This help</dd>
+    </dl>
+  </div>
+
+  <!-- Stack warning modal -->
+  <div id="modal-stack" class="modal" hidden role="dialog" aria-labelledby="stack-title">
+    <header class="modal-header">
+      <h2 id="stack-title">Position stack check</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <p id="stack-body"></p>
+    <footer class="modal-footer">
+      <button type="button" class="btn-primary" id="btn-stack-confirm">Draft anyway</button>
+      <button type="button" class="btn-ghost" data-close>Cancel</button>
+    </footer>
+  </div>
+
+  <!-- Trade response modal -->
+  <div id="modal-trade-resp" class="modal" hidden role="dialog" aria-labelledby="tr-title">
+    <header class="modal-header">
+      <h2 id="tr-title">Trade response</h2>
+      <button type="button" class="icon-btn" data-close>&times;</button>
+    </header>
+    <p id="trade-resp-body"></p>
+    <footer class="modal-footer">
+      <button type="button" class="btn-ghost" data-close>OK</button>
+    </footer>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- Scripts — strict load order: data first, then utilities, then controller -->
+<script src="data/teams.js"></script>
+<script src="data/prospects.js"></script>
+<script src="data/draftOrder.js"></script>
+<script src="data/tradeChart.js"></script>
+<script src="js/persistence.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/trades.js"></script>
+<script src="js/grades.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
