@@ -1,8 +1,11 @@
 // data/prospects.js — 2026 NFL Draft prospect board.
+// Data window: post-2026-02-15 consensus (Senior Bowl + combine + pro-day cycle).
 // TOP 50: verbatim from the NFL.com draft tracker (nfl.com/draft/tracker/2026/prospects)
 //         as of the day-of-draft pull. Real heights and weights.
 // 51+:    consensus-board mid-to-late prospects, deduped against the NFL.com top 50.
 //         Height/weight past the top 50 are position-typical estimates (est=true).
+// Note:   Only Mendoza (#4) grades as a true top-20 QB in this window; ai.js
+//         enforces a 1-QB cap in the first 20 picks.
 window.PROSPECTS = [
   // ============== NFL.com top 50 (real data) ==============
   { rank:1,  name:"Arvell Reese",           pos:"EDGE",school:"Ohio State",      ht:"6-4", wt:241, note:"Length, burst and blitz juice as an edge/LB convert; three-down ceiling." },

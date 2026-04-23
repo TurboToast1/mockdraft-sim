@@ -374,9 +374,20 @@
     const pool = getPool();
     let prospect = null;
     if (pool.length > 0) {
-      prospect = window.AI.pickFor(pickObj.team, pool, state.options);
+      prospect = window.AI.pickFor(pickObj.team, pool, state.options, pickContext(pickObj));
     }
     commitPick(pickObj, prospect, false);
+  }
+
+  function countQbsDrafted() {
+    return state.picks.reduce((n, pk) => {
+      const pr = window.PROSPECTS_BY_RANK[pk.prospectRank];
+      return n + (pr && pr.pos === "QB" ? 1 : 0);
+    }, 0);
+  }
+
+  function pickContext(pickObj) {
+    return { overall: pickObj.overall, qbsDrafted: countQbsDrafted() };
   }
 
   function startTimer(pickObj) {
@@ -391,7 +402,7 @@
         stopTimer();
         // Auto-pick via AI
         const pool = getPool();
-        const prospect = window.AI.pickFor(pickObj.team, pool, state.options);
+        const prospect = window.AI.pickFor(pickObj.team, pool, state.options, pickContext(pickObj));
         commitPick(pickObj, prospect, true);
       } else {
         updateTimerUI(remaining, seconds);
@@ -708,7 +719,7 @@
       if (!cur) break;
       // If user team and fastMode, auto-pick via AI
       const pool = getPool();
-      const prospect = pool.length > 0 ? window.AI.pickFor(cur.team, pool, state.options) : null;
+      const prospect = pool.length > 0 ? window.AI.pickFor(cur.team, pool, state.options, pickContext(cur)) : null;
       if (prospect) window.AI.updateNeeds(cur.team, prospect.pos);
       state.picks.push({
         overall: cur.overall, round: cur.round, pick: cur.pick, team: cur.team,
@@ -733,7 +744,7 @@
       if (!cur) break;
       if (isUserTeam(cur.team)) break;  // stop just before user's next pick
       const pool = getPool();
-      const prospect = pool.length > 0 ? window.AI.pickFor(cur.team, pool, state.options) : null;
+      const prospect = pool.length > 0 ? window.AI.pickFor(cur.team, pool, state.options, pickContext(cur)) : null;
       if (prospect) window.AI.updateNeeds(cur.team, prospect.pos);
       state.picks.push({
         overall: cur.overall, round: cur.round, pick: cur.pick, team: cur.team,
@@ -1028,7 +1039,7 @@
           if (!cur) return;
           // BPA for whoever's on the clock
           const pool = getPool();
-          const bpa = window.AI.pickFor(cur.team, pool, state.options);
+          const bpa = window.AI.pickFor(cur.team, pool, state.options, pickContext(cur));
           if (bpa) {
             if (isUserTeam(cur.team)) completeUserPick(bpa);
             else { clearAiTimer(); commitPick(cur, bpa, false); }

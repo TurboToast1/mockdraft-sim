@@ -1,14 +1,18 @@
 // js/ai.js — AI pick engine.
 // Scoring: 0.55 * BPA + 0.35 * need + 0.10 * noise.
-// QB premium for top-need-QB teams; occasional reach to mimic real GMs.
+// QB premium applies only to a legitimate top-tier QB; once one QB has gone
+// inside the top 20, remaining QBs are suppressed there — post-Feb-15-2026
+// consensus (post-combine/pro-day) only grades one QB as a true top-20 talent.
 (function () {
   window.AI = {
-    pickFor(team, pool, options) {
+    pickFor(team, pool, options, context) {
       if (!pool.length) return null;
       const randomness = (options && options.randomness != null) ? options.randomness : 0.1;
       const teamEntry = window.TEAMS_BY_ABBR[team];
       const needs = teamEntry ? teamEntry.needs : [];
       const poolSize = pool.length;
+      const overall = context && context.overall;
+      const qbsDrafted = (context && context.qbsDrafted) || 0;
 
       const scored = pool.map(p => {
         const bpa  = 1 - (p.rank - 1) / Math.max(poolSize * 2, 60);
@@ -18,9 +22,19 @@
         const noise = Math.random() * randomness;
         let score = 0.55 * bpa + 0.35 * need + 0.10 * noise;
 
-        // QB premium: top-need QB teams pounce on early-ranked QBs.
-        if (needs[0] === "QB" && p.pos === "QB" && p.rank <= 10) {
-          score *= 1.25;
+        if (p.pos === "QB") {
+          // Top-tier QB premium only for a true blue-chip (rank <= 5) with QB need.
+          if (needs[0] === "QB" && p.rank <= 5) {
+            score *= 1.25;
+          }
+          // Cap top-20 QBs at 1: heavy penalty if a QB already went inside #20.
+          if (overall && overall <= 20 && qbsDrafted >= 1) {
+            score *= 0.08;
+          }
+          // Even before one goes, a non-top-tier QB (rank > 15) shouldn't crash the top 20.
+          if (overall && overall <= 20 && p.rank > 15) {
+            score *= 0.35;
+          }
         }
         // De-emphasize K/P/LS until very late.
         if (["K","P","LS"].includes(p.pos)) {
